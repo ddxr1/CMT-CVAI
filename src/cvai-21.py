@@ -6,7 +6,7 @@ img = cv2.imread("./inputs/sample.jpg")
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
 depth_map = cv2.applyColorMap(gray, cv2.COLORMAP_JET)
-
+cv2.imwrite("./outputs/depth_map1.jpg", depth_map)
 cv2.imshow("Origin", img)
 cv2.imshow("Depth Map", depth_map)
 cv2.waitKey(0)
