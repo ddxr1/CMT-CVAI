@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 # 이미지 로드
-img = cv2.imread("sample.jpg") # 분석할 이미지 파일
+img = cv2.imread("./inputs/sample.jpg") # 분석할 이미지 파일
 # BGR에서 HSV 색상 공간으로 변환
 hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
@@ -19,6 +19,7 @@ mask = mask1 + mask2 # 두 개의 마스크를 합침
 
 # 원본 이미지에서 빨간색 부분만 추출
 result = cv2.bitwise_and(img, img, mask=mask)
+cv2.imwrite("./outputs/sample_output.jpg", result)
 
 # 결과 이미지 출력
 cv2.imshow('origin', img)
