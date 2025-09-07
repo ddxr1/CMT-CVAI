@@ -1,0 +1,7 @@
+# datasets 안 모든 데이터 제외
+src/week3/datasets/*
+
+# YOLO 학습 결과 제외
+src/week3/runs/detect/train/
+src/week3/runs/detect/train2/
+src/week3/runs/detect/val/
