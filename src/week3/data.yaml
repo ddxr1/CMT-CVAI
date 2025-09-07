@@ -1,0 +1,10 @@
+train: ./datasets/train/images
+val: ./datasets/val/images
+test: ./datasets/test/images
+
+nc: 2
+names: ['Smoke', 'Fire']
+
+train_count: 14122
+val_count: 3099
+test_count: 4306
