@@ -9,7 +9,7 @@ CMT-CVAI/
 ├─ outputs/ # 결과 저장 (Fire Detection, Depth Map 등)
 ├─ src/ # 소스 코드
 │ ├─ week1/ # 1주차: 이미지 전처리
-│ ├─ week2/ # 2주차: 2D → 3D 변환, 단위 테스트
+│ ├─ week2/ # 2주차: 2D → 3D 변환, pytest Unittest
 │ └─ week3/ # 3주차: YOLOv8 객체 탐지
 ├─ venv2/ # 가상환경
 └─ README.md
@@ -31,11 +31,11 @@ CMT-CVAI/
 ### 🔹 Week 2: 2D → 3D 변환 및 테스트
 - **파일**  
   - `processing_3d.py`, `processing_3d_hard.py`: Depth Map을 기반으로 3D 포인트 클라우드 생성  
-  - `test_processing_3d.py`, `simple_unittest.py`: 단위 테스트 코드 작성  
+  - `test_processing_3d.py`, `simple_unittest.py`: Unit test 코드 작성  
 
 - **성과**  
   - OpenCV & NumPy를 사용한 3D 변환 파이프라인 구축  
-  - 단위 테스트로 코드 신뢰성 확보  
+  - Unit test로 코드 신뢰성 확보  
 
 ---
 
@@ -47,7 +47,9 @@ CMT-CVAI/
 
 - **성과**  
   - 커스텀 데이터셋(`datasets/train`, `val`, `test`) 기반 학습  
-  - 성능 지표(Figure_1.png) 확인  
+  - 성능 지표(Figure_1.png) 확인 
+<img width="640" height="480" alt="Figure_1" src="https://github.com/user-attachments/assets/3c0afd22-d41d-4f3a-ad44-2b71ddcabe66" />
+ 
   - 이미지/영상 객체 탐지 구현  
 
 ---
