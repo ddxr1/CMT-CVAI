@@ -10,7 +10,8 @@ CMT-CVAI/
 ├─ src/ # 소스 코드
 │ ├─ week1/ # 1주차: 이미지 전처리
 │ ├─ week2/ # 2주차: 2D → 3D 변환, pytest Unittest
-│ └─ week3/ # 3주차: YOLOv8 객체 탐지
+│ ├─ week3/ # 3주차: YOLOv8 객체 탐지
+│ └─ week4/ # 4주차: 실시간 화재 탐지 시스템
 ├─ venv2/ # 가상환경
 └─ README.md
 ```
@@ -54,20 +55,56 @@ CMT-CVAI/
 
 ---
 
+### 🔹 Week 4: 실시간 화재 탐지 시스템
+- **파일**  
+  - `main.py`: 메인 진입점 (GUI/콘솔 선택)  
+  - `fire_detector_app.py`: Tkinter 기반 GUI 애플리케이션  
+  - `fire_detection_opencv.py`: OpenCV HSV 색공간 기반 화재 감지  
+  - `fire_detection_yolo.py`: YOLOv8 기반 화재 객체 탐지  
+  - `real_time_fire_detector.py`: 하이브리드 실시간 감지 시스템  
+  - `fire_logger.py`: CSV 형식 로깅 시스템  
+  - `config.py`: 설정 관리  
+
+- **성과**  
+  - **GUI 인터페이스**: 사용자 친화적인 실시간 화재 감지 애플리케이션  
+  - **다중 감지 모드**: OpenCV, YOLO, 하이브리드 모드 지원  
+  - **실시간 처리**: 웹캠/비디오 파일 실시간 화재 감지  
+  - **결과 영상 저장**: bounding box가 포함된 감지 결과를 MP4로 저장  
+  - **로깅 시스템**: CSV 형식으로 감지 결과 및 통계 기록  
+  - **Unit Test**: 모든 모듈에 대한 완전한 테스트 커버리지  
+  - **자동 영상 종료 처리**: 영상 재생 완료 시 자동 감지 중지  
+
+---
+
 ## ⚙️ 실행 환경
+
+### Week 1-2 (Python 3.13)
 - Python 3.13+
+- OpenCV
+- Matplotlib, NumPy
+
+### Week 3-4 (Python 3.11)
+- Python 3.11
 - OpenCV
 - PyTorch
 - Ultralytics YOLOv8
 - Matplotlib, NumPy
+- Tkinter (GUI)
+- Pillow (이미지 처리)
+- Pandas (데이터 처리)
 
-> 가상환경: `venv2/`
+> **가상환경**:  
+> - Week 1-2: `venv2/` (Python 3.13)  
+> - Week 3-4: `venv311/` (Python 3.11)  
+> - Week 4 추가 패키지: `src/week4/requirements.txt` 참조
 
 ---
 
 ## 실행 방법
 
 ### 1. 가상환경 활성화
+
+#### Week 1-2 (Python 3.13)
 ```bash
 # Windows
 venv2/Scripts/activate
@@ -76,19 +113,44 @@ venv2/Scripts/activate
 source venv2/bin/activate
 ```
 
+#### Week 3-4 (Python 3.11)
+```bash
+# Windows
+venv311/Scripts/activate
+
+# Linux / Mac
+source venv311/bin/activate
+```
+
+### 2. 주차별 실행
+
+#### Week 1-2 (venv2 환경에서 실행)
+```bash
 # 1주차 전처리
 python src/week1/image_preprocessing.py
 
 # 2주차 3D 변환
 python src/week2/processing_3d.py
+```
 
+#### Week 3-4 (venv311 환경에서 실행)
+```bash
 # 3주차 YOLO 학습
 python src/week3/train_yolo.py
 
+# 4주차 실시간 화재 탐지 시스템
+python src/week4/main.py
+```
+
 ## 결과 예시
 
-outputs/depth_map1.jpg, outputs/depth_map2.jpg: 3D 변환 결과
+**Week 1**: `outputs/sample_output.jpg` - 이미지 전처리 결과
 
-outputs/sample_output.jpg: 이미지 전처리 결과
+**Week 2**: `outputs/depth_map1.jpg`, `outputs/depth_map2.jpg` - 3D 변환 결과
 
-week3/Figure_1.png: YOLO 성능 평가 그래프
+**Week 3**: `src/week3/Figure_1.png` - YOLO 성능 평가 그래프
+
+**Week 4**: 
+- `src/week4/outputs/` - 실시간 화재 감지 결과 영상 (MP4)
+- `src/week4/logs/` - 화재 감지 로그 파일 (CSV)
+- GUI 애플리케이션으로 실시간 화재 감지 및 시각화
