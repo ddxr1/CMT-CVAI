@@ -5,3 +5,29 @@ src/week3/datasets/*
 src/week3/runs/detect/train/
 src/week3/runs/detect/train2/
 src/week3/runs/detect/val/
+
+# 가상환경
+venv*/
+.venv/
+
+# 모델 weight
+*.pt
+
+# YOLO / 실험 결과
+runs/
+week3/runs/
+week4/logs/
+week4/test/logs/
+
+# 파이썬 캐시
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pytest_cache/
+
+# 입력 영상 제외
+week4/inputs/*.mp4
+
+# 기타 로그 제외
+*.log
