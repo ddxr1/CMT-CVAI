@@ -6,6 +6,12 @@ src/week3/runs/detect/train/
 src/week3/runs/detect/train2/
 src/week3/runs/detect/val/
 
+# src/week4 입력/로그 제외
+src/week4/inputs/
+src/week4/logs/
+src/week4/test/logs/
+
+
 # 가상환경
 venv*/
 .venv/
