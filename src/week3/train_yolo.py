@@ -21,6 +21,7 @@ model.train(
     epochs=20,
     imgsz=640,
     batch=16,
-    argument=True,
-    fraction=0.5
+    augment=True,
+    fraction=0.5,
+    device="cpu"
 )
