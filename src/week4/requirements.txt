@@ -1,0 +1,26 @@
+# 화재 객체 탐지 시스템 필수 패키지
+
+# 핵심 라이브러리
+opencv-python>=4.8.0
+ultralytics>=8.0.0
+numpy>=1.24.0
+Pillow>=9.5.0
+
+# GUI 라이브러리
+tkinter  # Python 내장 (별도 설치 불필요)
+
+# 로깅 및 데이터 처리
+pandas>=2.0.0
+matplotlib>=3.7.0
+
+# 비디오 처리
+imageio>=2.31.0
+imageio-ffmpeg>=0.4.8
+
+# 유틸리티
+tqdm>=4.65.0
+colorama>=0.4.6
+
+# 개발 및 테스트 (선택사항)
+pytest>=7.4.0
+pytest-cov>=4.1.0
