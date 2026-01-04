@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 from typing import List, Tuple, Optional
+from pathlib import Path
 import logging
 import os
 
@@ -33,18 +34,23 @@ class FireDetectorYOLO:
         
         # 모델 로드
         try:
-            # 절대 경로로 변환
-            if not os.path.isabs(model_path):
-                model_path = os.path.abspath(model_path)
+            # Path 객체로 변환하여 경로 처리 개선
+            from pathlib import Path
             
-            if os.path.exists(model_path):
-                self.model = YOLO(model_path)
-                self.logger.info(f"YOLO 모델 로드 성공: {model_path}")
+            model_file = Path(model_path)
+            if not model_file.is_absolute():
+                model_file = Path(__file__).parent / model_file
+            
+            if model_file.exists():
+                self.model = YOLO(str(model_file))
+                self.logger.info(f"YOLO 모델 로드 성공: {model_file}")
             else:
-                # 프로젝트 루트의 기본 모델 사용
-                default_model = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "yolov8n.pt")
-                if os.path.exists(default_model):
-                    self.model = YOLO(default_model)
+                # 프로젝트 루트의 기본 모델 시도
+                project_root = Path(__file__).parent.parent.parent.parent
+                default_model = project_root / "yolov8n.pt"
+                
+                if default_model.exists():
+                    self.model = YOLO(str(default_model))
                     self.logger.warning(f"학습된 모델을 찾을 수 없습니다. 기본 모델 사용: {default_model}")
                 else:
                     # Ultralytics에서 자동 다운로드
@@ -52,7 +58,12 @@ class FireDetectorYOLO:
                     self.logger.warning(f"기본 모델을 찾을 수 없습니다. 자동 다운로드: yolov8n.pt")
         except Exception as e:
             self.logger.error(f"모델 로드 실패: {e}")
-            self.model = YOLO("yolov8n.pt")
+            try:
+                self.model = YOLO("yolov8n.pt")
+                self.logger.info("기본 모델로 폴백")
+            except Exception as fallback_error:
+                self.logger.critical(f"모델 로드 완전 실패: {fallback_error}")
+                raise RuntimeError("YOLO 모델을 로드할 수 없습니다.") from fallback_error
     
     def detect_fire(self, frame: np.ndarray) -> Tuple[bool, List[Tuple[int, int, int, int, float, str]]]:
         """
@@ -79,29 +90,41 @@ class FireDetectorYOLO:
                 return False, []
             
             # YOLO 모델로 탐지 실행
-            results = self.model(frame, conf=self.confidence_threshold, device=self.device)
+            results = self.model(frame, conf=self.confidence_threshold, device=self.device, verbose=False)
             
             detections = []
             fire_detected = False
             
+            # 화재 관련 클래스 키워드 (소문자로 통일)
+            fire_keywords = ['fire', 'smoke', 'flame', 'burning']
+            
             for result in results:
-                if result.boxes is not None:
+                if result.boxes is not None and len(result.boxes) > 0:
                     for box in result.boxes:
-                        # 바운딩 박스 좌표
-                        x1, y1, x2, y2 = map(int, box.xyxy[0])
-                        
-                        # 클래스 정보
-                        class_id = int(box.cls[0])
-                        class_name = result.names[class_id]
-                        confidence = float(box.conf[0])
-                        
-                        # 화재 관련 클래스만 필터링 (Fire, Smoke 등)
-                        # 학습된 모델의 경우 클래스명을 확인하고, 기본 모델의 경우 모든 객체를 화재로 간주
-                        if ('fire' in class_name.lower() or 'smoke' in class_name.lower() or 
-                            class_name.lower() in ['fire', 'smoke', 'flame'] or
-                            len(self.model.names) == 80):  # COCO 데이터셋의 경우 모든 객체 허용
-                            detections.append((x1, y1, x2, y2, confidence, class_name))
-                            fire_detected = True
+                        try:
+                            # 바운딩 박스 좌표
+                            xyxy = box.xyxy[0].cpu().numpy()
+                            x1, y1, x2, y2 = map(int, xyxy)
+                            
+                            # 좌표 유효성 검증
+                            h, w = frame.shape[:2]
+                            x1 = max(0, min(x1, w))
+                            y1 = max(0, min(y1, h))
+                            x2 = max(0, min(x2, w))
+                            y2 = max(0, min(y2, h))
+                            
+                            # 클래스 정보
+                            class_id = int(box.cls[0].cpu().numpy())
+                            class_name = result.names.get(class_id, "unknown")
+                            confidence = float(box.conf[0].cpu().numpy())
+                            
+                            # 화재 관련 클래스만 필터링
+                            if any(keyword in class_name.lower() for keyword in fire_keywords):
+                                detections.append((x1, y1, x2, y2, confidence, class_name))
+                                fire_detected = True
+                        except Exception as box_error:
+                            self.logger.warning(f"바운딩 박스 처리 중 오류: {box_error}")
+                            continue
             
             if fire_detected:
                 self.logger.info(f"YOLO 화재 탐지: {len(detections)}개 객체")
@@ -123,16 +146,31 @@ class FireDetectorYOLO:
         Returns:
             시각화된 프레임
         """
+        if frame is None or len(detections) == 0:
+            return frame.copy() if frame is not None else None
+        
         result_frame = frame.copy()
         
         for x1, y1, x2, y2, confidence, class_name in detections:
-            # 바운딩 박스 그리기
-            cv2.rectangle(result_frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-            
-            # 라벨 그리기
-            label = f"{class_name} {confidence:.2f}"
-            cv2.putText(result_frame, label, (x1, y1 - 10), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+            try:
+                # 좌표 유효성 검증
+                h, w = result_frame.shape[:2]
+                x1 = max(0, min(x1, w))
+                y1 = max(0, min(y1, h))
+                x2 = max(0, min(x2, w))
+                y2 = max(0, min(y2, h))
+                
+                # 바운딩 박스 그리기
+                cv2.rectangle(result_frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                
+                # 라벨 그리기 (텍스트가 프레임 밖으로 나가지 않도록 조정)
+                label = f"{class_name} {confidence:.2f}"
+                label_y = max(y1 - 10, 20)  # 최소 20픽셀 여백
+                cv2.putText(result_frame, label, (x1, label_y), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+            except Exception as draw_error:
+                self.logger.warning(f"그리기 중 오류: {draw_error}")
+                continue
         
         return result_frame
     
@@ -141,10 +179,17 @@ class FireDetectorYOLO:
         신뢰도 임계값 업데이트
         
         Args:
-            threshold: 새로운 신뢰도 임계값
+            threshold: 새로운 신뢰도 임계값 (0.0 ~ 1.0)
+            
+        Raises:
+            ValueError: 임계값이 유효 범위를 벗어난 경우
         """
+        if not 0.0 <= threshold <= 1.0:
+            raise ValueError(f"신뢰도 임계값은 0.0과 1.0 사이여야 합니다: {threshold}")
+        
+        old_threshold = self.confidence_threshold
         self.confidence_threshold = threshold
-        self.logger.info(f"신뢰도 임계값 업데이트: {threshold}")
+        self.logger.info(f"신뢰도 임계값 업데이트: {old_threshold:.2f} -> {threshold:.2f}")
     
     def get_model_info(self) -> dict:
         """
@@ -154,12 +199,27 @@ class FireDetectorYOLO:
             모델 정보 딕셔너리
         """
         try:
-            return {
-                "model_name": self.model.model_name if hasattr(self.model, 'model_name') else "YOLOv8",
+            info = {
+                "model_name": getattr(self.model, 'model_name', 'YOLOv8'),
                 "confidence_threshold": self.confidence_threshold,
                 "device": self.device,
-                "classes": list(self.model.names.values()) if hasattr(self.model, 'names') else []
+                "classes": []
             }
+            
+            # 클래스 정보 추출
+            if hasattr(self.model, 'names') and self.model.names:
+                info["classes"] = list(self.model.names.values())
+                info["num_classes"] = len(self.model.names)
+            
+            # 모델 경로 정보 추가
+            if hasattr(self.model, 'ckpt_path') and self.model.ckpt_path:
+                info["model_path"] = str(self.model.ckpt_path)
+            
+            return info
         except Exception as e:
             self.logger.error(f"모델 정보 조회 실패: {e}")
-            return {}
+            return {
+                "error": str(e),
+                "confidence_threshold": self.confidence_threshold,
+                "device": self.device
+            }

@@ -81,25 +81,41 @@ class RealTimeFireDetector:
             output_file: 출력 비디오 파일 경로
             show_preview: 미리보기 창 표시 여부
         """
+        # 이미 실행 중이면 종료
+        if self.is_running:
+            self.logger.warning("이미 감지가 실행 중입니다.")
+            return
+        
         try:
             # 비디오 캡처 초기화
             self.cap = cv2.VideoCapture(video_source)
             if not self.cap.isOpened():
                 raise Exception(f"비디오 소스 열기 실패: {video_source}")
             
-            # 비디오 설정
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-            self.cap.set(cv2.CAP_PROP_FPS, 30)
+            # 비디오 설정 (웹캠인 경우만)
+            if isinstance(video_source, int):
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                self.cap.set(cv2.CAP_PROP_FPS, 30)
             
             # 출력 비디오 설정
             self.video_writer = None
             if output_file:
-                fourcc = cv2.VideoWriter_fourcc(*'XVID')
-                fps = int(self.cap.get(cv2.CAP_PROP_FPS))
+                from pathlib import Path
+                output_path = Path(output_file)
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # mp4v 코덱 사용 (더 호환성 좋음)
+                fps = int(self.cap.get(cv2.CAP_PROP_FPS)) or 30
                 width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                 height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                self.video_writer = cv2.VideoWriter(output_file, fourcc, fps, (width, height))
+                
+                self.video_writer = cv2.VideoWriter(str(output_path), fourcc, fps, (width, height))
+                if not self.video_writer.isOpened():
+                    self.logger.warning(f"출력 비디오 파일을 열 수 없습니다: {output_file}")
+                    self.video_writer = None
+                else:
+                    self.logger.info(f"출력 비디오 저장: {output_file}")
             
             self.is_running = True
             self.logger.info("실시간 화재 감지 시작")
@@ -109,49 +125,68 @@ class RealTimeFireDetector:
             
         except Exception as e:
             self.logger.error(f"감지 시작 실패: {e}")
+            raise
         finally:
             self.stop_detection()
     
     def _detection_loop(self, show_preview: bool):
         """감지 메인 루프"""
-        while self.is_running:
-            ret, frame = self.cap.read()
-            if not ret:
-                self.logger.warning("프레임 읽기 실패")
-                break
-            
-            self.current_frame = frame
-            self.total_frames += 1
-            
-            # 화재 감지
-            fire_detected, detection_info = self._detect_fire(frame)
-            
-            # 결과 시각화
-            result_frame = self._visualize_results(frame, fire_detected, detection_info)
-            
-            # 로그 기록
-            self._log_detection(fire_detected, detection_info)
-            
-            # 출력 비디오 저장
-            if self.video_writer:
-                self.video_writer.write(result_frame)
-            
-            # 미리보기 표시
-            if show_preview:
-                cv2.imshow("Real-time Fire Detection", result_frame)
-                
-                # 키 입력 처리
-                key = cv2.waitKey(1) & 0xFF
-                if key == ord('q'):
-                    self.logger.info("사용자에 의해 종료됨")
+        frame_skip = 0  # 프레임 스킵 카운터 (성능 최적화)
+        
+        try:
+            while self.is_running:
+                ret, frame = self.cap.read()
+                if not ret:
+                    self.logger.warning("프레임 읽기 실패 또는 비디오 종료")
                     break
-                elif key == ord('s'):
-                    self._save_current_frame()
-                elif key == ord('i'):
-                    self._print_detection_info()
-            
-            # FPS 제한
-            time.sleep(0.033)  # 약 30 FPS
+                
+                # 프레임 스킵 (성능 최적화 - 매 3프레임마다 1프레임만 처리)
+                frame_skip += 1
+                if frame_skip % 3 == 0:  # 매 3프레임마다 처리
+                    continue
+                
+                self.current_frame = frame
+                self.total_frames += 1
+                
+                # 화재 감지
+                fire_detected, detection_info = self._detect_fire(frame)
+                
+                # 결과 시각화
+                result_frame = self._visualize_results(frame, fire_detected, detection_info)
+                
+                # 로그 기록
+                self._log_detection(fire_detected, detection_info)
+                
+                # 출력 비디오 저장
+                if self.video_writer and self.video_writer.isOpened():
+                    self.video_writer.write(result_frame)
+                
+                # 미리보기 표시
+                if show_preview:
+                    cv2.imshow("Real-time Fire Detection", result_frame)
+                    
+                    # 키 입력 처리
+                    key = cv2.waitKey(1) & 0xFF
+                    if key == ord('q'):
+                        self.logger.info("사용자에 의해 종료됨")
+                        break
+                    elif key == ord('s'):
+                        self._save_current_frame()
+                    elif key == ord('i'):
+                        self._print_detection_info()
+                    elif key == ord(' '):  # 스페이스바로 일시정지
+                        cv2.waitKey(0)
+                
+                # FPS 제한 (약 30 FPS)
+                time.sleep(0.033)
+                
+        except KeyboardInterrupt:
+            self.logger.info("키보드 인터럽트로 종료")
+        except Exception as e:
+            self.logger.error(f"감지 루프 중 오류 발생: {e}")
+        finally:
+            if show_preview:
+                cv2.destroyAllWindows()
     
     def _detect_fire(self, frame: np.ndarray) -> Tuple[bool, dict]:
         """
@@ -327,10 +362,20 @@ class RealTimeFireDetector:
     def _save_current_frame(self):
         """현재 프레임 저장"""
         if self.current_frame is not None:
+            from pathlib import Path
             timestamp = time.strftime("%Y%m%d_%H%M%S")
-            filename = f"fire_detection_{timestamp}.jpg"
-            cv2.imwrite(filename, self.current_frame)
-            self.logger.info(f"프레임 저장: {filename}")
+            
+            # 출력 디렉토리 생성
+            output_dir = Path("outputs")
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            filename = output_dir / f"fire_detection_{timestamp}.jpg"
+            if cv2.imwrite(str(filename), self.current_frame):
+                self.logger.info(f"프레임 저장: {filename}")
+            else:
+                self.logger.error(f"프레임 저장 실패: {filename}")
+        else:
+            self.logger.warning("저장할 프레임이 없습니다.")
     
     def _print_detection_info(self):
         """감지 정보 출력"""
@@ -338,17 +383,37 @@ class RealTimeFireDetector:
         self.logger.info(f"감지 통계 (최근 1시간): {stats}")
     
     def stop_detection(self):
-        """감지 중지"""
+        """감지 중지 및 리소스 해제"""
         self.is_running = False
         
-        if hasattr(self, 'cap'):
-            self.cap.release()
-        
-        if hasattr(self, 'video_writer') and self.video_writer:
-            self.video_writer.release()
-        
-        cv2.destroyAllWindows()
-        self.logger.info("화재 감지 중지")
+        try:
+            # 비디오 캡처 해제
+            if hasattr(self, 'cap') and self.cap is not None:
+                self.cap.release()
+                self.cap = None
+                self.logger.debug("비디오 캡처 해제 완료")
+            
+            # 비디오 라이터 해제
+            if hasattr(self, 'video_writer') and self.video_writer is not None:
+                if self.video_writer.isOpened():
+                    self.video_writer.release()
+                self.video_writer = None
+                self.logger.debug("비디오 라이터 해제 완료")
+            
+            # OpenCV 창 닫기
+            cv2.destroyAllWindows()
+            
+            # 통계 로그 출력
+            if self.total_frames > 0:
+                detection_rate = (self.fire_detections / self.total_frames) * 100
+                self.logger.info(f"화재 감지 중지 - 총 프레임: {self.total_frames}, "
+                               f"화재 감지: {self.fire_detections}, "
+                               f"감지율: {detection_rate:.2f}%")
+            else:
+                self.logger.info("화재 감지 중지")
+                
+        except Exception as e:
+            self.logger.error(f"리소스 해제 중 오류 발생: {e}")
     
     def get_statistics(self) -> dict:
         """감지 통계 반환"""
